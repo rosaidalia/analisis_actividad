@@ -1,0 +1,171 @@
+---
+title: "Análisis de la actividad física"
+author: '"Rosa Idalia Sánchez Hernández"'
+date: "18 de marzo de 2016"
+output: 
+  html_document: 
+    keep_md: yes
+---
+
+**Introducción**
+
+Con el fin de reducir el riesgo de enfermedades se recomienda la activación física aeróbica, de intensidad moderada. Se desea conocer los hábitos de una persona que no tiene mucho tiempo para ir al gimnasio, así que se estudia la cantidad de pasos que da en intervalos de 5 minutos durante dos meses. Después se desea comparar esta actividad física entre semana y los fines de semana.   
+
+Para cargar los datos que se utilizaron, primero debemos fijar el directorio en donde se encuentran los datos, en este caso se guardaron en la variable activity.
+
+```{r}
+setwd("/Users/rosai/Documents/descargas lunes 14 marzo 2016/R markdown")
+activity=read.csv("activity.csv")
+
+```
+
+En el siguiente cuadro podemos visualizar solo el encabezado de los datos tal como se registraron, la primer columna muestra el numero de pasos registrados, la segunda columna muestra la fecha en que se tomo la medición y la tercer columna contiene un identificador del intervalo. 
+```{r}
+print(head(activity))
+```
+
+
+Procesamiento de los datos
+
+Con la siguiente instrucción se desea conocer mas información acerca de la cantidad de veces que se repite la fecha, y posterior a eso se observa que el número de intervalos medidos por día es el mismo de 288. 
+ Asi se decide reorganizar la información en una matriz de 288 filas y 61 columnas , cada columna son las mediciones tomadas en un dia diferente.
+ 
+```{r}
+info=table(activity[,2])  
+pasos=matrix(activity[,1], nrow=288 , ncol = 61, byrow = FALSE)
+
+```
+A continuación se muestra la matriz con el reacomodo de los datos, pero como el archivo seria muy largo solo se mostraran para los primeros 12 días
+
+```{r}
+print(pasos[,1:12])
+```
+
+Con los datos ya reacomodados calculamos la media y la mediana de los datos por día, con las siguientes instrucciones 
+
+```{r}
+media=rep(0,61)
+mediana=rep(0,61)
+for (i in 1:61)
+{media[i]=mean(pasos[,i])
+mediana[i]=median(pasos[,i])}
+```
+```{r}
+print(media)
+print(mediana)
+```
+
+Visualicemos la siguiente gráfica de barras en donde se muestra la media de la cantidad de pasos registrados por cada dia 
+
+```{r, echo=FALSE}
+barplot(media, ylab="media de los pasos por dias", xlab="dias de actividad")
+```
+
+Se crearon una lista de los índices en que cambia la fecha para manipularlos de forma posterior
+
+```{r}
+dias=(1:61)  
+dias=dias*288;
+```
+
+Con la siguiente instrucción se reconoce el formato de la segunda columna de la matriz activity como fechas y con el comando weekdays se puede obtener el día de la semana asociado a cada una de las fechas 
+
+```{r}
+today<-as.Date(activity[dias,2])
+dias2=weekdays(today, abbreviate = FALSE)
+```
+
+
+Se crean los siguientes arreglos para guardar las medias correspondientes a los fines de semana y las correspondientes a los días entre semana 
+
+```{r}
+findesem=media[which((dias2=="sábado" | dias2=="domingo"))]
+entresem=media[-which((dias2=="sábado" | dias2=="domingo"))]
+```
+
+A continuación se grafican las medias entre semana y en fin de semana
+
+```{r}
+par(mfrow=c(1,2))
+barplot(entresem , ylab="media de los pasos por día", xlab="dias entre semana")
+barplot(findesem, ylab="media de los pasos por día", xlab="fines de semana")
+```
+
+Para comparar las dos poblaciones se crea una prueba t-student con la  finalidad de ver si hay diferencia una diferencia significativa entre la cantidad de pasos que se dan entre semana y en fin de semana con la siguiente intruccion
+
+```{r}
+t.test(entresem,findesem) 
+```
+
+La hipotesis nula es que las dos medias son iguales. Como el p-valor es 0.02 con este p-valor puedes rechazar la hipotesis nula a un 95 % de confianza. Ademas como el intervalo es negativo esto indica que en fin de semana se camina mas que entre semana.
+
+
+En la lista de los datos se puede observar que existen valores NA , lo cual indica que ese día no se registró informacion correspondiente al numero de pasos. Se utilizará la siguiente instrucción para identificar la posición de estos valores "NA".
+```{r}
+datos_na=which(is.na(activity[,1]))
+```
+
+
+Para reemplazarlos se utilizará una función de Poisson con la media de los datos que se tienen como parametro "mu", esto se realiza con la función rpois como se muestra a continuación. 
+
+```{r}
+mu=mean(activity[-datos_na,1])
+n_na=length(datos_na)  
+list_poisson=rpois(n_na,mu)
+```
+
+
+Se crea una copia del registro de los pasos en donde se reemplazaran los datos con NA
+```{r}
+activity_copia=activity
+activity_copia[datos_na,1]=list_poisson
+```
+
+Veamos como quedan los datos una vez que se sustituyeron los valores NA, mostrando solo el encabezado de los datos.
+```{r}
+head(activity_copia)
+```
+
+Como se realizó anteriormente se crea una matriz con el reacomodo de los datos, pero como el archivo seria muy largo solo se mostrarán para los primeros 12 dias
+```{r}
+pasos_2=matrix(activity_copia[,1], nrow=288 , ncol = 61, byrow = FALSE)
+pasos_2[,1:12]
+```
+
+Se calcula la media y la mediana por dia para estos datos y podemos observar que ya no aparece ningún NA como sucedió anteriormente
+```{r}
+media_2=rep(0,61)
+mediana_2=rep(0,61)
+for (i in 1:61)
+{media_2[i]=mean(pasos_2[,i])
+mediana_2[i]=median(pasos_2[,i])}
+```
+
+```{r}
+print(media_2)
+print(mediana_2)
+```
+
+Veamos la gráfica de actividad diaria
+```{r}
+par(mfrow=c(1,1))
+barplot(media_2, ylab="media de los pasos por dias", xlab="dias de actividad")
+```
+
+Realizaremos una prueba t-student entre los datos con NA y los datos en los que NA se sustituyó
+```{r}
+t.test(media,media_2)
+```
+
+La hipótesis nula es que las medias son iguales y con los resultados de la prueba t-student la hipótesis nula no se debe rechazar. Con lo que podemos concluir que los datos que se sustituyeron con la distribución de poisson son consistentes con el resto de la información.
+
+
+**Conclusiones**
+
+La persona realiza mas ejercicio en fin de semana que entre semana esto de forma proporcional al periodo tiempo. 
+Los datos que se sustituyeron con la distribución de poisson son consistentes con el resto de la información.
+Si la persona quiere mejorar su actividad física tal vez deba mejorar más la actividad entre semana.
+
+
+
+
